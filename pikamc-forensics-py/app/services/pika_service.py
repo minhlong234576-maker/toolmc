@@ -55,9 +55,10 @@ class PikaService:
         # Cache key ổn định: sort params để cùng query -> cùng key bất kể thứ tự
         params_key = json.dumps(params, sort_keys=True, default=str) if params else ""
         cache_key = f"pika:GET:{path}:{params_key}"
-        cached = cache_get(cache_key)
-        if cached is not None:
-            return cached
+        if ttl > 0:
+            cached = cache_get(cache_key)
+            if cached is not None:
+                return cached
 
         client = self._get_client()
         last_err: Exception | None = None
@@ -69,8 +70,10 @@ class PikaService:
                     data = resp.json()
                 else:
                     data = resp.content
-                cache_set(cache_key, data, ttl)
+                if ttl > 0:
+                    cache_set(cache_key, data, ttl)
                 return data
+
             except httpx.HTTPStatusError as e:
                 if e.response.status_code < 500 and e.response.status_code != 429:
                     logger.warning("PikaMC API %s -> HTTP %d", path, e.response.status_code)
@@ -514,23 +517,33 @@ class PikaService:
         if log_content:
             log_text = log_content.decode("utf-8", errors="ignore") if isinstance(log_content, bytes) else str(log_content)
             log_online_names: set[str] = set()
-            for line in log_text.splitlines()[-250:]:
+            log_offline_names: set[str] = set()
+            for line in log_text.splitlines()[-300:]:
                 m_j = re.search(r"\[(\d{2}:\d{2}:\d{2})\].*?:\s+.*?([\w\.\_]+)\s+joined the game", line)
                 if not m_j:
                     m_j = re.search(r"\[(\d{2}:\d{2}:\d{2})\].*?:\s+.*?player logged in as\s+([\w\.\_]+)\s+joined", line)
                 if m_j:
-                    log_online_names.add(m_j.group(2).lower())
+                    pname = m_j.group(2).lower()
+                    log_online_names.add(pname)
+                    log_offline_names.discard(pname)
+
                 m_l = re.search(r"\[(\d{2}:\d{2}:\d{2})\].*?:\s+.*?([\w\.\_]+)\s+left the game", line)
                 if not m_l:
                     m_l = re.search(r"\[(\d{2}:\d{2})\].*?:\s+.*?player logged in as\s+([\w\.\_]+)\s+disconnected", line)
                 if not m_l and "lost connection" in line:
                     m_l = re.search(r"\[(\d{2}:\d{2}:\d{2})\].*?:\s+.*?([\w\.\_]+)\s+lost connection", line)
                 if m_l:
-                    log_online_names.discard(m_l.group(2).lower())
+                    pname = m_l.group(2).lower()
+                    log_online_names.discard(pname)
+                    log_offline_names.add(pname)
 
             for p in players_map.values():
-                if p.get("name", "").lower() in log_online_names:
+                p_name_lower = p.get("name", "").lower()
+                if p_name_lower in log_offline_names and p.get("status") == "online":
+                    p["status"] = "offline"
+                elif p_name_lower in log_online_names:
                     p["status"] = "online"
+
 
         # 5. Quét bổ sung các file player data (.dat) trong world/players/data hoặc world/playerdata
         for folder in ["world/players/data", "world/playerdata"]:

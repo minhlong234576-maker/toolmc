@@ -1561,10 +1561,11 @@
         const res = await api(`/api/servers/${serverId}/players?force_refresh=true`);
         const freshPlayers = res.players || [];
 
-        // Check if there are newly joined players compared to known list
+        // Check if there are newly joined or disconnected players compared to known list
         if (knownPlayerUuids.size > 0) {
           const brandNew = freshPlayers.filter(p => !knownPlayerUuids.has(p.uuid));
           const newlyOnline = freshPlayers.filter(p => p.status === 'online' && knownPlayerStatusMap.get(p.uuid) !== 'online');
+          const newlyOffline = freshPlayers.filter(p => p.status !== 'online' && knownPlayerStatusMap.get(p.uuid) === 'online');
 
           if (brandNew.length > 0) {
             brandNew.forEach(p => {
@@ -1575,8 +1576,11 @@
           } else if (newlyOnline.length > 0) {
             playJoinNotificationSound();
             showToast(`🟢 ${newlyOnline[0].name} vừa đăng nhập vào server!`, 'info');
+          } else if (newlyOffline.length > 0) {
+            showToast(`🔴 ${newlyOffline[0].name} đã rời khỏi server.`, 'info');
           }
         }
+
 
         // Update tracking maps
         knownPlayerUuids = new Set(freshPlayers.map(p => p.uuid));
@@ -1648,15 +1652,18 @@
       }
 
       container.innerHTML = list.map(p => {
+        let statusBadge = '';
+        if (p.status === 'online') {
+          statusBadge = '<span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[10px] font-mono">🟢 On</span>';
+        } else if (p.status === 'banned') {
+          statusBadge = '<span class="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 text-[10px] font-mono">🔴 Ban</span>';
+        } else {
+          statusBadge = '<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-[10px] font-mono">⚪ Off</span>';
+        }
+
         let roleBadge = '';
         if (p.role === 'admin') {
           roleBadge = '<span class="px-1.5 py-0.5 rounded bg-amber-950 text-amber-300 text-[10px] font-mono">👑 OP</span>';
-        } else if (p.status === 'banned') {
-          roleBadge = '<span class="px-1.5 py-0.5 rounded bg-rose-950 text-rose-300 text-[10px] font-mono">🔴 Ban</span>';
-        } else if (p.status === 'online') {
-          roleBadge = '<span class="px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 text-[10px] font-mono">🟢 On</span>';
-        } else {
-          roleBadge = '<span class="px-1.5 py-0.5 rounded bg-gray-800 text-gray-400 text-[10px] font-mono">⚪ Data</span>';
         }
 
         let newGlow = '';
@@ -1674,11 +1681,13 @@
                 <div class="font-bold text-xs text-gray-200 truncate flex items-center gap-1.5">
                   <span>${esc(p.name)}</span>
                   ${roleBadge}
+                  ${statusBadge}
                   ${newBadge}
                 </div>
                 <div class="text-[10px] text-gray-500 font-mono truncate">${esc(p.uuid?.slice(0, 10))}...</div>
               </div>
             </div>
+
             <button onclick='event.stopPropagation(); selectAndInvestigate("${esc(p.name)}", "${esc(p.uuid)}")' class="px-2 py-1 rounded bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 text-[11px] font-mono flex-shrink-0 transition" title="Điều tra ngay người này">
               🔍
             </button>
@@ -3023,6 +3032,39 @@ Hãy thực hiện thẩm định:
         // 2. Tab 1 online count & live activity ticker
         const countOnline = document.getElementById('countOnline');
         if (countOnline) countOnline.textContent = pulse.online_count || 0;
+
+        // 2.1. Đồng bộ tức thời trạng thái online vào danh sách người chơi Tab 1
+        if (pulse.online_players && Array.isArray(currentPlayers) && currentPlayers.length > 0) {
+          const activeUuids = new Set(pulse.online_players.map(p => p.uuid));
+          const activeNames = new Set(pulse.online_players.map(p => (p.name || '').toLowerCase()));
+          let stateChanged = false;
+
+          for (const p of currentPlayers) {
+            const isOnline = activeUuids.has(p.uuid) || activeNames.has((p.name || '').toLowerCase());
+            if (isOnline && p.status !== 'online') {
+              p.status = 'online';
+              stateChanged = true;
+            } else if (!isOnline && p.status === 'online') {
+              p.status = 'offline';
+              stateChanged = true;
+            }
+          }
+
+          if (stateChanged) {
+            const allCount = currentPlayers.length;
+            const adminCount = currentPlayers.filter(p => p.role === 'admin').length;
+            const bannedCount = currentPlayers.filter(p => p.status === 'banned').length;
+            const onlineCount = currentPlayers.filter(p => p.status === 'online').length;
+
+            if (document.getElementById('countAll')) document.getElementById('countAll').textContent = allCount;
+            if (document.getElementById('countAdmin')) document.getElementById('countAdmin').textContent = adminCount;
+            if (document.getElementById('countBanned')) document.getElementById('countBanned').textContent = bannedCount;
+            if (document.getElementById('countOnline')) document.getElementById('countOnline').textContent = onlineCount;
+
+            filterPlayers();
+          }
+        }
+
 
         if (pulse.events && pulse.events.length > 0) {
           const latest = pulse.events[0];
