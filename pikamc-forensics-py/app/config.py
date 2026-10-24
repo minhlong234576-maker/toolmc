@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./data/forensics.db"
 
-    # PikaMC API (chỉ GET)
+    # PikaMC API (bắt buộc người dùng cấu hình qua Web UI hoặc env)
     PIKAMC_API_URL: str = "https://hub.pikamc.vn/api"
-    PIKAMC_API_KEY: str = "your_key_here"
+    PIKAMC_API_KEY: str = ""
 
     # AI providers
     GEMINI_API_KEY: str = ""
@@ -33,10 +33,12 @@ class Settings(BaseSettings):
     XAI247_API_URL: str = "https://xai247.xyz/v1"
     XAI247_MODEL: str = "claude-3-5-sonnet"
 
-    # Security
+    # Security & Policy
+    READ_ONLY_MODE: bool = True
     API_SECRET: str = "your_frontend_auth_secret"
     RATE_LIMIT: str = "100/minute"
     CACHE_TTL: int = 300
+
 
 
 @lru_cache

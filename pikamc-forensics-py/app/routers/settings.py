@@ -30,6 +30,10 @@ class SettingUpdate(BaseModel):
     value: object  # nhận bất kỳ type JSON
 
 
+class ReadOnlyToggleRequest(BaseModel):
+    read_only: bool
+
+
 class SystemConfigUpdate(BaseModel):
     pikamc_api_key: str | None = None
     pikamc_api_url: str | None = None
@@ -79,6 +83,7 @@ async def get_system_config(
         return actual if reveal else mask_key(actual)
 
     db_settings = get_all_settings(db)
+    active_ro = getattr(settings, "READ_ONLY_MODE", True)
 
     return {
         "pikamc": {
@@ -86,10 +91,11 @@ async def get_system_config(
             "api_key": _val(settings.PIKAMC_API_KEY, bool(settings.PIKAMC_API_KEY)),
             "has_api_key": bool(settings.PIKAMC_API_KEY),
         },
+        "read_only_mode": active_ro,
         "ai": {
             "default_provider": db_settings.get("default_provider", "xai247"),
             "default_model": db_settings.get("default_model", ""),
-            "strict_read_only": db_settings.get("strict_read_only", True),
+            "strict_read_only": active_ro,
             "xai247": {
                 "api_url": settings.XAI247_API_URL,
                 "api_key": _val(settings.XAI247_API_KEY, bool(settings.XAI247_API_KEY)),
@@ -172,6 +178,10 @@ async def update_system_config(
     if req.ollama_host and req.ollama_host.strip():
         updates["ollama_host"] = req.ollama_host.strip()
 
+    # Read-Only Mode
+    if req.strict_read_only is not None:
+        updates["strict_read_only"] = req.strict_read_only
+
     # Áp dụng runtime vào Settings in-memory và file .env
     if updates:
         apply_runtime_settings(updates)
@@ -192,6 +202,26 @@ async def update_system_config(
         "ok": True,
         "updated_keys": list(updates.keys()),
         "message": "Đã lưu cấu hình thành công! Dữ liệu đã được áp dụng trực tiếp cho hệ thống.",
+    }
+
+
+@router.post("/read-only")
+async def toggle_read_only(
+    req: ReadOnlyToggleRequest,
+    db: Session = Depends(get_db),
+) -> dict[str, object]:
+    """Bật/tắt nhanh chế độ Read-Only trực tiếp từ Header hoặc UI."""
+    apply_runtime_settings({"strict_read_only": req.read_only})
+    set_setting(db, "strict_read_only", req.read_only)
+    msg = (
+        "Đã BẬT chế độ Chỉ Đọc (Read-Only) an toàn. AI chỉ phân tích và bị cấm đề xuất lệnh ban/kick/xóa."
+        if req.read_only
+        else "Đã TẮT chế độ Chỉ Đọc. Kích hoạt toàn quyền Quản trị viên (được phép đề xuất lệnh console /ban, /kick, /op)."
+    )
+    return {
+        "ok": True,
+        "read_only": req.read_only,
+        "message": msg,
     }
 
 

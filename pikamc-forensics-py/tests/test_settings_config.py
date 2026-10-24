@@ -105,3 +105,59 @@ def test_test_ai_connection_mocked():
         assert data["ok"] is True
         assert data["provider"] == "xai247"
         assert "thành công" in data["response"]
+
+
+def test_toggle_read_only_mode():
+    """Kiểm tra bật/tắt chế độ Read-Only và kiểm tra quyền thi hành lệnh trong AI."""
+    settings = get_settings()
+    original_ro = settings.READ_ONLY_MODE
+
+    try:
+        # 1. Tắt Read-Only mode (Toàn quyền quản trị)
+        res = client.post("/api/settings/read-only", json={"read_only": False})
+        assert res.status_code == 200
+        assert res.json()["ok"] is True
+        assert res.json()["read_only"] is False
+        assert settings.READ_ONLY_MODE is False
+
+        # Kiểm tra GET /api/settings/config phản ánh đúng
+        cfg_res = client.get("/api/settings/config")
+        assert cfg_res.status_code == 200
+        assert cfg_res.json()["read_only_mode"] is False
+
+        # 2. Khi Read-Only = False, AI KHÔNG bị chặn bởi từ khóa nguy hiểm (ban/kick)
+        with patch("app.routers.ai.analyze_with_provider", return_value=("[FULL ADMIN] Đã đề xuất lệnh /ban player", 150)):
+            ai_res = client.post(
+                "/api/ai/analyze",
+                json={
+                    "prompt": "Hãy đề xuất lệnh ban player hacker123",
+                    "provider": "xai247",
+                    "model": "deepseek-v4.1-flash",
+                    "strict_read_only": False
+                }
+            )
+            assert ai_res.status_code == 200
+            assert "ban" in ai_res.json()["response"]
+            assert ai_res.json()["strict_read_only"] is False
+
+        # 3. Bật lại Read-Only mode (Giám định an toàn)
+        res2 = client.post("/api/settings/read-only", json={"read_only": True})
+        assert res2.status_code == 200
+        assert res2.json()["ok"] is True
+        assert res2.json()["read_only"] is True
+        assert settings.READ_ONLY_MODE is True
+
+        # Khi Read-Only = True, từ khóa nguy hiểm bị chặn 400
+        ai_blocked = client.post(
+            "/api/ai/analyze",
+            json={
+                "prompt": "ban player hacker123",
+                "provider": "xai247",
+                "model": "deepseek-v4.1-flash",
+                "strict_read_only": True
+            }
+        )
+        assert ai_blocked.status_code == 400
+        assert "bị cấm" in ai_blocked.json()["detail"].lower() or "read-only" in ai_blocked.json()["detail"].lower()
+    finally:
+        client.post("/api/settings/read-only", json={"read_only": original_ro})

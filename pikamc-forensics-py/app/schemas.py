@@ -103,7 +103,7 @@ class AIAnalyzeRequest(BaseModel):
     provider: Literal["gemini", "openai", "ollama", "meta", "llama", "xai247"] = "gemini"
     model: str | None = None
     temperature: float = 0.3
-    strict_read_only: bool = True
+    strict_read_only: bool | None = None
 
 
 class AIAnalyzeResponse(BaseModel):

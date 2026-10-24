@@ -78,7 +78,7 @@
       <div>
         <div class="flex items-center gap-2">
           <span class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-gray-100 to-gray-400 bg-clip-text text-transparent">PikaMC Forensics</span>
-          <span class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 glow-red">
+          <span id="hdrModeBadge" class="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 glow-red">
             READ-ONLY
           </span>
         </div>
@@ -114,6 +114,10 @@
         <span id="healthText" class="text-gray-300">Kết nối OK</span>
       </div>
 
+      <button onclick="toggleReadOnlyMode()" id="btnToggleReadOnly" class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/80 font-mono text-[11px] font-bold transition shadow" title="Bật/Tắt chế độ Chỉ Đọc (Read-Only)">
+        <span id="readOnlyIcon">🛡️</span> <span id="readOnlyText">Read-Only: BẬT</span>
+      </button>
+
       <button onclick="toggleRealtimeSync()" id="btnToggleSync" class="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-indigo-950 hover:bg-indigo-900 text-indigo-300 border border-indigo-800 font-mono text-[11px] transition" title="Bật/Tắt cập nhật Real-time tự động">
         <span>🔄</span> Realtime: ON
       </button>
@@ -123,6 +127,19 @@
       </button>
     </div>
   </header>
+
+  <!-- API Key Warning Banner (Bắt buộc người dùng cấu hình khi thiếu API Key) -->
+  <div id="apiKeyRequiredBanner" class="hidden bg-gradient-to-r from-amber-950/90 via-rose-950/90 to-amber-950/90 border-b border-amber-600/50 px-6 py-2.5 text-xs text-amber-200">
+    <div class="max-w-6xl mx-auto flex items-center justify-between gap-3 flex-wrap">
+      <div class="flex items-center gap-2">
+        <span class="text-base">⚠️</span>
+        <span><strong>Chưa cấu hình API Key:</strong> Chế độ mặc định an toàn đã bị tắt. Hệ thống bắt buộc bạn phải nhập PikaMC API Key để kết nối máy chủ thực tế.</span>
+      </div>
+      <button onclick="openSettings('pika')" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-gray-950 font-bold transition whitespace-nowrap shadow flex items-center gap-1.5">
+        <span>🔑</span> Nhập PikaMC API Key
+      </button>
+    </div>
+  </div>
 
   <!-- ================= NAVIGATION TABS ================= -->
   <div class="border-b border-gray-800/80 bg-gray-950/40 px-6">
@@ -444,7 +461,7 @@
               </span>
             </div>
             <div id="aiTelemetryPreviewPill" class="text-[11px] font-mono text-gray-400 flex items-center gap-2">
-              <span class="text-indigo-400">Server: <strong id="aiContextServerId">3fe38490</strong></span>
+              <span class="text-indigo-400">Server: <strong id="aiContextServerId">—</strong></span>
               <span class="text-gray-600">|</span>
               <span class="text-purple-300">108 Online</span>
             </div>
@@ -1209,7 +1226,7 @@
       <div class="space-y-3 text-xs text-gray-300 leading-relaxed mb-5">
         <p id="powerConfirmDesc">Bạn có chắc chắn muốn thực hiện hành động này không?</p>
         <div class="p-3 rounded-lg bg-gray-900/80 border border-gray-800 text-[11px] text-gray-400 font-mono space-y-1">
-          <div>🌐 <b>Server:</b> <span id="powerConfirmServerName" class="text-indigo-300">hosting-Bảo Gia</span></div>
+          <div>🌐 <b>Server:</b> <span id="powerConfirmServerName" class="text-indigo-300">—</span></div>
           <div>⚠️ <b>Lưu ý:</b> Các người chơi đang online có thể bị ngắt kết nối.</div>
         </div>
       </div>
@@ -1402,39 +1419,58 @@
       await loadServers();
     }
 
+    function getSelectedServerId() {
+      const sel = document.getElementById('serverSelect');
+      const val = sel ? sel.value.trim() : '';
+      if (val) return val;
+      if (currentServers && currentServers.length > 0 && currentServers[0].id) {
+        return currentServers[0].id;
+      }
+      return '';
+    }
+
     async function loadServers() {
       const sel = document.getElementById('serverSelect');
       const scanSel = document.getElementById('scanServerSelect');
       const badge = document.getElementById('serverCountBadge');
+      const banner = document.getElementById('apiKeyRequiredBanner');
 
       try {
         const res = await api('/api/servers');
         currentServers = res.servers || [];
 
         if (!currentServers.length) {
-          sel.innerHTML = '<option value="pika-01">Server mặc định (pika-01)</option>';
-          scanSel.innerHTML = '<option value="pika-01">Server mặc định (pika-01)</option>';
-          badge.textContent = 'Chưa có server online';
+          if (sel) sel.innerHTML = '<option value="">⚠️ Chưa có Server (Yêu cầu cấu hình PikaMC API Key)</option>';
+          if (scanSel) scanSel.innerHTML = '<option value="">⚠️ Chưa có Server</option>';
+          if (badge) badge.textContent = 'Chưa cấu hình API Key';
+          if (banner) banner.classList.remove('hidden');
+          const aiContext = document.getElementById('aiContextServerId');
+          if (aiContext) aiContext.textContent = '—';
           return;
         }
 
-        badge.textContent = `${currentServers.length} server kết nối`;
+        if (banner) banner.classList.add('hidden');
+        if (badge) badge.textContent = `${currentServers.length} server kết nối`;
         const optionsHtml = currentServers.map(s => `
           <option value="${esc(s.id)}">${esc(s.name)} [ID: ${esc(s.id)}] (${esc(s.status)})</option>
         `).join('');
 
-        sel.innerHTML = optionsHtml;
-        scanSel.innerHTML = optionsHtml;
+        if (sel) sel.innerHTML = optionsHtml;
+        if (scanSel) scanSel.innerHTML = optionsHtml;
+
+        const aiContext = document.getElementById('aiContextServerId');
+        if (aiContext && currentServers[0]) aiContext.textContent = currentServers[0].id;
 
         // Auto load players for first server
         if (currentServers.length > 0) {
           await loadPlayersForServer(currentServers[0].id);
         }
       } catch (e) {
-        sel.innerHTML = '<option value="pika-01">pika-01 (Offline fallback)</option>';
-        scanSel.innerHTML = '<option value="pika-01">pika-01 (Offline fallback)</option>';
-        badge.textContent = 'Offline';
-        showToast('Không tải được server từ API: ' + e.message, 'error');
+        if (sel) sel.innerHTML = '<option value="">⚠️ Lỗi kết nối PikaMC API</option>';
+        if (scanSel) scanSel.innerHTML = '<option value="">⚠️ Lỗi kết nối</option>';
+        if (badge) badge.textContent = 'Lỗi API Key';
+        if (banner) banner.classList.remove('hidden');
+        showToast('Không tải được server từ PikaMC API: ' + e.message, 'warning');
       }
     }
 
@@ -1520,7 +1556,7 @@
       const btn = document.getElementById('toggleLiveSyncBtn');
       const dot = document.getElementById('liveSyncDot');
       const text = document.getElementById('liveSyncStatusText');
-      const serverId = document.getElementById('serverSelect')?.value || '3fe38490';
+      const serverId = getSelectedServerId();
 
       if (isPlayerLiveSyncEnabled) {
         if (btn) btn.className = 'px-2.5 py-1 rounded-lg bg-emerald-950/70 border border-emerald-800 text-emerald-300 text-[11px] font-mono flex items-center gap-1.5 transition hover:bg-emerald-900/80';
@@ -1835,8 +1871,7 @@
 
     /* ============ TAB 1: Điều Tra Đơn Lẻ ============ */
     async function investigate() {
-      const serverSelect = document.getElementById('serverSelect');
-      const server_id = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const server_id = getSelectedServerId();
       let player_name = document.getElementById('invName').value.trim();
       const player_uuid = document.getElementById('invUuid').value.trim();
 
@@ -2001,8 +2036,8 @@
     let lastRenderedResultCount = 0;
 
     async function startScan() {
-      const serverSelect = document.getElementById('scanServerSelect');
-      const server_id = serverSelect ? serverSelect.value.trim() : (currentServerId || '3fe38490');
+      const scanServerSelect = document.getElementById('scanServerSelect');
+      const server_id = (scanServerSelect && scanServerSelect.value.trim()) ? scanServerSelect.value.trim() : getSelectedServerId();
       if (!server_id) {
         showToast('Vui lòng chọn Server để quét!', 'error');
         return;
@@ -2323,8 +2358,7 @@ Hãy thực hiện thẩm định:
         return;
       }
 
-      const serverSelect = document.getElementById('serverSelect');
-      const server_id = (serverSelect && serverSelect.value.trim()) ? serverSelect.value.trim() : '3fe38490';
+      const server_id = getSelectedServerId();
       const playerFocus = document.getElementById('aiPlayerFocusSelect')?.value || '';
       const customPlayer = document.getElementById('aiCustomPlayerInput')?.value.trim() || '';
       const player_name = customPlayer || playerFocus || null;
@@ -2349,8 +2383,8 @@ Hãy thực hiện thẩm định:
           prompt,
           provider: cfg.provider || 'xai247',
           model: cfg.model || '',
-          strict_read_only: cfg.strict !== false,
-          server_id,
+          strict_read_only: isSystemReadOnly,
+          server_id: server_id || undefined,
           player_name,
           include_world_data,
           include_logs,
@@ -2711,6 +2745,60 @@ Hãy thực hiện thẩm định:
 
     /* ============ SYSTEM CONFIGURATION & API KEY ENGINE ============ */
     let currentSystemConfig = null;
+    let isSystemReadOnly = true;
+
+    function updateReadOnlyUI(isReadOnly) {
+      isSystemReadOnly = !!isReadOnly;
+      const hdrBadge = document.getElementById('hdrModeBadge');
+      const btn = document.getElementById('btnToggleReadOnly');
+      const icon = document.getElementById('readOnlyIcon');
+      const text = document.getElementById('readOnlyText');
+      const setStrict = document.getElementById('setStrict');
+
+      if (setStrict) setStrict.checked = isSystemReadOnly;
+
+      if (isSystemReadOnly) {
+        if (hdrBadge) {
+          hdrBadge.className = 'px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-rose-500/10 text-rose-400 border border-rose-500/30 glow-red';
+          hdrBadge.textContent = 'READ-ONLY';
+        }
+        if (btn) {
+          btn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-950/70 hover:bg-amber-900 text-amber-300 border border-amber-800/80 font-mono text-[11px] font-bold transition shadow';
+        }
+        if (icon) icon.textContent = '🛡️';
+        if (text) text.textContent = 'Read-Only: BẬT';
+      } else {
+        if (hdrBadge) {
+          hdrBadge.className = 'px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 glow-indigo';
+          hdrBadge.textContent = 'FULL ADMIN';
+        }
+        if (btn) {
+          btn.className = 'flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-emerald-950/80 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/80 font-mono text-[11px] font-bold transition shadow';
+        }
+        if (icon) icon.textContent = '⚡';
+        if (text) text.textContent = 'Read-Only: TẮT (Toàn quyền)';
+      }
+    }
+
+    async function toggleReadOnlyMode() {
+      const nextState = !isSystemReadOnly;
+      const confirmMsg = nextState
+        ? 'Bạn có muốn BẬT lại chế độ Read-Only (Giám định an toàn tuyệt đối)?\nAI sẽ chỉ phân tích telemetry và không đề xuất can thiệp.'
+        : 'CẢNH BÁO QUẢN TRỊ VIÊN:\nBạn đang chuẩn bị TẮT chế độ Read-Only!\nHệ thống sẽ chuyển sang chế độ Toàn quyền Quản trị (Full Admin), cho phép AI đề xuất lệnh console can thiệp (/ban, /kick, /op).\n\nBạn có chắc chắn muốn chuyển đổi?';
+
+      if (!confirm(confirmMsg)) return;
+
+      try {
+        const res = await api('/api/settings/read-only', {
+          method: 'POST',
+          body: JSON.stringify({ read_only: nextState }),
+        });
+        updateReadOnlyUI(res.read_only);
+        showToast(res.message, res.read_only ? 'info' : 'warning');
+      } catch (e) {
+        showToast('Lỗi cập nhật trạng thái Read-Only: ' + e.message, 'error');
+      }
+    }
 
     function switchSettingSubTab(tab) {
       const tabs = ['pika', 'xai', 'meta', 'others', 'general'];
@@ -2734,9 +2822,9 @@ Hãy thực hiện thẩm định:
       el.type = el.type === 'password' ? 'text' : 'password';
     }
 
-    async function openSettings() {
+    async function openSettings(tab = 'pika') {
       document.getElementById('settingsModal').classList.remove('hidden');
-      switchSettingSubTab('pika');
+      switchSettingSubTab(tab || 'pika');
       await loadSystemConfigIntoModal();
     }
 
@@ -2753,6 +2841,10 @@ Hãy thực hiện thẩm định:
       try {
         const res = await api('/api/settings/config?reveal=false');
         currentSystemConfig = res;
+
+        if (res.read_only_mode !== undefined) {
+          updateReadOnlyUI(res.read_only_mode);
+        }
 
         // 1. PikaMC
         const pika = res.pikamc || {};
@@ -2870,6 +2962,8 @@ Hãy thực hiện thẩm định:
         cfg.model = body.default_model;
         cfg.strict = body.strict_read_only;
         localStorage.setItem('pika_cfg', JSON.stringify(cfg));
+
+        updateReadOnlyUI(body.strict_read_only);
 
         const tabSelect = document.getElementById('aiTabProviderSelect');
         if (tabSelect) tabSelect.value = cfg.provider;
@@ -3007,8 +3101,7 @@ Hãy thực hiện thẩm định:
     }
 
     async function pollMasterRealtimePulse() {
-      const serverSelect = document.getElementById('serverSelect');
-      const serverId = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const serverId = getSelectedServerId();
       if (!serverId || !isMasterRealtimeSync) return;
 
       try {
@@ -3142,8 +3235,7 @@ Hãy thực hiện thẩm định:
 
     /* ============ WORLD DATA DEEP OVERVIEW ============ */
     async function loadWorldOverview(showNotify = false) {
-      const serverSelect = document.getElementById('serverSelect');
-      const serverId = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const serverId = getSelectedServerId();
       if (!serverId) return;
 
       try {
@@ -3174,8 +3266,7 @@ Hãy thực hiện thẩm định:
 
     /* ============ LOGS INSPECTOR (ALL-TIME LOGS & CONSOLE STREAM) ============ */
     async function loadLogFilesList() {
-      const serverSelect = document.getElementById('serverSelect');
-      const serverId = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const serverId = getSelectedServerId();
       const sel = document.getElementById('logFileSelect');
       if (!sel || !serverId) return;
 
@@ -3258,8 +3349,7 @@ Hãy thực hiện thẩm định:
     }
 
     async function loadConsoleLogs(isManual = false) {
-      const serverSelect = document.getElementById('serverSelect');
-      const serverId = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const serverId = getSelectedServerId();
       const consoleBox = document.getElementById('srvDashConsole');
       if (!consoleBox || !serverId) return;
 
@@ -3333,8 +3423,7 @@ Hãy thực hiện thẩm định:
     let currentServerOverview = null;
 
     async function loadServerDashboard() {
-      const serverSelect = document.getElementById('serverSelect');
-      const serverId = serverSelect ? serverSelect.value.trim() : '3fe38490';
+      const serverId = getSelectedServerId();
       if (!serverId) return;
 
       try {
@@ -3433,11 +3522,6 @@ Hãy thực hiện thẩm định:
     /* ============ Server Power Control ============ */
     let pendingPowerAction = null;
 
-    function getSelectedServerId() {
-      const serverSelect = document.getElementById('serverSelect');
-      return (serverSelect && serverSelect.value.trim()) ? serverSelect.value.trim() : '3fe38490';
-    }
-
     function confirmPowerAction(action) {
       pendingPowerAction = action;
       const modal = document.getElementById('powerConfirmModal');
@@ -3447,7 +3531,7 @@ Hãy thực hiện thẩm định:
       const icon = document.getElementById('powerConfirmIcon');
       const btn = document.getElementById('btnPowerConfirmAction');
 
-      const sName = document.getElementById('srvDashName')?.textContent || 'hosting-Bảo Gia';
+      const sName = document.getElementById('srvDashName')?.textContent || 'Minecraft Server';
       srvName.textContent = sName;
 
       if (action === 'restart') {
@@ -3781,10 +3865,18 @@ Hãy thực hiện thẩm định:
 
     /* ============ Initialization ============ */
 
-    document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('DOMContentLoaded', async () => {
       checkHealth();
       healthTimer = setInterval(checkHealth, 25000);
       initAiTemplates();
+      try {
+        const cfgRes = await api('/api/settings/config?reveal=false');
+        if (cfgRes.read_only_mode !== undefined) {
+          updateReadOnlyUI(cfgRes.read_only_mode);
+        }
+      } catch (e) {
+        // Fallback default
+      }
       loadServers();
       refreshAiStatus();
       startMasterRealtimeSync();

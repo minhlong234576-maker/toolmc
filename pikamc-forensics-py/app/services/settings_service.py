@@ -127,6 +127,8 @@ def apply_runtime_settings(updates: dict[str, Any]) -> None:
         "xai247_api_key": "XAI247_API_KEY",
         "xai247_api_url": "XAI247_API_URL",
         "xai247_model": "XAI247_MODEL",
+        "read_only_mode": "READ_ONLY_MODE",
+        "strict_read_only": "READ_ONLY_MODE",
     }
 
     env_updates: dict[str, str] = {}
@@ -135,13 +137,18 @@ def apply_runtime_settings(updates: dict[str, Any]) -> None:
     for k, v in updates.items():
         if v is None:
             continue
-        v_str = str(v).strip()
         env_attr = field_map.get(k)
         if env_attr and hasattr(settings, env_attr):
-            setattr(settings, env_attr, v_str)
-            env_updates[env_attr] = v_str
-            if "pikamc" in k:
-                reset_pika = True
+            if env_attr == "READ_ONLY_MODE":
+                bool_val = v if isinstance(v, bool) else (str(v).lower() in ("true", "1", "yes"))
+                setattr(settings, env_attr, bool_val)
+                env_updates[env_attr] = "true" if bool_val else "false"
+            else:
+                v_str = str(v).strip()
+                setattr(settings, env_attr, v_str)
+                env_updates[env_attr] = v_str
+                if "pikamc" in k:
+                    reset_pika = True
 
     if reset_pika:
         from app.services.pika_service import pika_service

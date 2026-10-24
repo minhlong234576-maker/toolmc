@@ -195,7 +195,8 @@ async def analyze(req: AIAnalyzeRequest, db: Session = Depends(get_db)) -> AIAna
     t0 = time.perf_counter()
 
     # 1) Kiểm tra prompt nếu strict read-only
-    if req.strict_read_only:
+    active_read_only = req.strict_read_only if req.strict_read_only is not None else getattr(settings, "READ_ONLY_MODE", True)
+    if active_read_only:
         is_safe, reason = ro.validate_prompt(req.prompt)
         if not is_safe:
             raise HTTPException(400, reason)
@@ -232,7 +233,7 @@ async def analyze(req: AIAnalyzeRequest, db: Session = Depends(get_db)) -> AIAna
 
     full_prompt = "\n".join(prompt_parts)
 
-    # 4) Build system prompt (READ-ONLY enforcement + Elite Forensic persona)
+    # 4) Build system prompt (READ-ONLY enforcement vs FULL ADMINISTRATOR mode)
     forensic_persona = """
 [STRICT READ-ONLY MODE - TRỢ LÝ AI GIÁM ĐỊNH CHUYÊN SÂU MINECRAFT]
 Bạn là Trợ lý AI Giám định Chuyên sâu (Senior Minecraft Forensic Investigator).
@@ -249,8 +250,21 @@ QUY TẮC BẤT KHẢ KHÁNG:
 5. Trả lời bằng tiếng Việt chuyên nghiệp, khoa học, có cấu trúc rõ ràng.
 """.strip()
 
-    system_prompt = forensic_persona if req.strict_read_only else \
-        "Bạn là hệ thống phân tích dữ liệu Minecraft Server. Nghiêm cấm đề xuất hành động ghi/sửa/xóa."
+    admin_persona = """
+[FULL ADMINISTRATOR MODE - TRỢ LÝ QUẢN TRỊ VIÊN MINECRAFT SERVER CAO CẤP]
+Bạn là Trợ lý Quản trị viên Cao cấp (Senior Minecraft Server Administrator & Forensics Lead).
+Chế độ Read-Only hiện đang TẮT — bạn đang hoạt động với đầy đủ quyền hạn quản trị máy chủ.
+Bạn được cấp quyền tiếp cận dữ liệu telemetry thời gian thực gồm: World Data, Live Logs và User/NBT Data.
+
+QUY TẮC HOẠT ĐỘNG:
+1. Đưa ra nhận định kỹ thuật chính xác dựa trên dữ liệu telemetry và chứng cứ thu thập được.
+2. Bạn ĐƯỢC PHÉP và NÊN đề xuất các lệnh console Minecraft cụ thể (ví dụ: /ban, /tempban, /kick, /pardon, /clear, /gamemode, /deop, /whitelist, /tp) để quản trị viên sao chép và thi hành khi phát hiện vi phạm rõ ràng.
+3. Hướng dẫn chi tiết các bước cô lập, khắc phục sự cố, rollback CoreProtect hoặc cấu hình plugin chống gian lận (GrimAC, Vulcan, Matrix, LiteBans).
+4. Phân biệt rõ giữa lag mạng/desync và hack/dupe thật sự trước khi đề xuất hình thức kỷ luật.
+5. Trả lời bằng tiếng Việt chuyên nghiệp, quyết đoán, bảo vệ an toàn và sự công bằng cho máy chủ.
+""".strip()
+
+    system_prompt = forensic_persona if active_read_only else admin_persona
 
     model = req.model or DEFAULT_MODELS.get(req.provider, "")
     # Truyền model đã resolve vào AIOptions để provider dùng đúng model mặc định
@@ -275,7 +289,7 @@ QUY TẮC BẤT KHẢ KHÁNG:
         prompt=full_prompt[:10000],
         response=response_text[:50000],
         provider=req.provider, model=model,
-        strict_read_only=req.strict_read_only,
+        strict_read_only=active_read_only,
     )
     db.add(row)
     db.commit()
@@ -283,7 +297,7 @@ QUY TẮC BẤT KHẢ KHÁNG:
     return AIAnalyzeResponse(
         response=response_text, provider=req.provider, model=model,
         duration_ms=int((time.perf_counter() - t0) * 1000) or duration_ms,
-        strict_read_only=req.strict_read_only,
+        strict_read_only=active_read_only,
     )
 
 

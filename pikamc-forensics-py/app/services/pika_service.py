@@ -360,6 +360,10 @@ class PikaService:
 
     async def get_servers(self, ttl: int = 180) -> list[dict[str, Any]]:
         """Lấy danh sách các Server Minecraft thực tế trên tài khoản PikaMC."""
+        if not settings.PIKAMC_API_KEY or not settings.PIKAMC_API_KEY.strip():
+            logger.info("PIKAMC_API_KEY chưa được cấu hình. Bắt buộc người dùng nhập API Key để lấy danh sách máy chủ.")
+            return []
+
         # 1. Thử Pterodactyl-based client API
         data = await self._get("/api/client/servers", ttl=ttl)
         if data and isinstance(data, dict):
@@ -391,14 +395,9 @@ class PikaService:
             if servers:
                 return servers
 
-        # 3. Fallback server mặc định nếu API không trả về danh sách
-        return [{
-            "id": "3fe38490",
-            "uuid": "3fe38490-0446-49be-a45a-0ecd69c0cac9",
-            "name": "hosting-Bảo Gia",
-            "status": "online",
-            "node": "default",
-        }]
+        # Không dùng server mẫu mặc định an toàn — bắt buộc người dùng tự cấu hình API Key
+        return []
+
 
     async def get_player_list(self, server_id: str, ttl: int = 60, force_refresh: bool = False) -> list[dict[str, Any]]:
         """Lấy danh sách TOÀN BỘ player của server (từ usercache.json, ops.json, banned-players.json và world files)."""
