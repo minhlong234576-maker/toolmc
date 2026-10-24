@@ -209,6 +209,63 @@ class MetaAIProvider(AIProvider):
             raise RuntimeError(f"Meta AI chat lỗi (model: {model_id}): {e}") from e
 
 
+XAI247_VALID_MODELS = {
+    "deepseek-v4.1-flash",
+    "deepseek-v4-pro",
+    "claude-sonnet-4-6",
+    "claude-sonnet-5",
+    "claude-opus-5",
+    "claude-opus-4-6",
+    "claude-opus-4-7",
+    "claude-opus-4-8",
+    "claude-opus-5.5",
+    "claude-fable-5",
+    "claude-fable-5.1",
+    "gpt-6-luna",
+    "qwen3.8-flash",
+    "qwen3.8-max",
+    "glm-5.2",
+    "glm-5.3",
+    "glm-5.3-flash",
+    "kimi-k3",
+}
+
+XAI247_MODEL_ALIASES = {
+    "claude-3-5-sonnet": "claude-sonnet-4-6",
+    "claude-3.5-sonnet": "claude-sonnet-4-6",
+    "claude-3-sonnet": "claude-sonnet-4-6",
+    "claude-sonnet": "claude-sonnet-4-6",
+    "claude-3-opus": "claude-opus-5",
+    "claude-opus": "claude-opus-5",
+    "claude-fable": "claude-fable-5",
+    "deepseek-4.1-flash": "deepseek-v4.1-flash",
+    "deepseek-flash": "deepseek-v4.1-flash",
+    "deepseek-v4-flash": "deepseek-v4.1-flash",
+    "deepseek-v4": "deepseek-v4-pro",
+    "deepseek-r1": "deepseek-v4-pro",
+    "deepseek-v3": "deepseek-v4-pro",
+    "deepseek-chat": "deepseek-v4.1-flash",
+    "gpt-4o": "gpt-6-luna",
+    "gpt-4o-mini": "gpt-6-luna",
+    "gpt-4": "gpt-6-luna",
+    "qwen": "qwen3.8-flash",
+    "glm": "glm-5.3-flash",
+}
+
+
+def resolve_xai247_model(raw_name: str | None) -> str:
+    """Chuẩn hóa model ID theo danh sách thực tế của xai247.xyz, tránh lỗi Model not found."""
+    if not raw_name or not raw_name.strip():
+        return "deepseek-v4.1-flash"
+    clean = raw_name.strip().lower()
+    if clean in XAI247_MODEL_ALIASES:
+        return XAI247_MODEL_ALIASES[clean]
+    if clean in XAI247_VALID_MODELS:
+        return clean
+    logger.warning("Model '%s' không có trong danh mục xai247.xyz, tự động dùng 'deepseek-v4.1-flash'", raw_name)
+    return "deepseek-v4.1-flash"
+
+
 class XAI247Provider(AIProvider):
     """XAI247 AI Gateway (xai247.xyz - hỗ trợ Claude, GPT-4o, DeepSeek, Llama qua 1 API key duy nhất)."""
 
@@ -241,7 +298,7 @@ class XAI247Provider(AIProvider):
             base_url = raw_url
 
         endpoint = f"{base_url}/chat/completions"
-        model_id = options.model or curr_settings.XAI247_MODEL or self.default_model
+        model_id = resolve_xai247_model(options.model or curr_settings.XAI247_MODEL or self.default_model)
 
         payload = {
             "model": model_id,

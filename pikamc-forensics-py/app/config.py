@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     META_MODEL: str = "llama-3.3-70b-instruct"
     XAI247_API_KEY: str = ""
     XAI247_API_URL: str = "https://xai247.xyz/v1"
-    XAI247_MODEL: str = "claude-3-5-sonnet"
+    XAI247_MODEL: str = "deepseek-v4.1-flash"
 
     # Security & Policy
     READ_ONLY_MODE: bool = True
