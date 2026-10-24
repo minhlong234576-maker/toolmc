@@ -6,7 +6,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """Toàn bộ secrets/cấu hình đi qua env, KHÔNG hardcode."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=(".env", "pikamc-forensics-py/.env"),
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
     # App
     APP_HOST: str = "0.0.0.0"
