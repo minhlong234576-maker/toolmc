@@ -42,3 +42,9 @@ Thumbs.db
 _reference/
 _skills/
 
+# PyInstaller build artifacts
+build/
+dist/
+*.exe
+
+

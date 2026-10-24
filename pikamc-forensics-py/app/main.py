@@ -78,10 +78,21 @@ app.include_router(history.router)
 app.include_router(settings_router.router)
 
 # Frontend single-file
-_index = __import__("pathlib").Path(__file__).parent / "static" / "index.html"
+import sys
+from pathlib import Path
+
+
+def get_static_index() -> Path:
+    """Xác định đường dẫn index.html hỗ trợ cả môi trường dev và PyInstaller (.exe)."""
+    if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+        bundled = Path(sys._MEIPASS) / "app" / "static" / "index.html"
+        if bundled.exists():
+            return bundled
+    return Path(__file__).resolve().parent / "static" / "index.html"
 
 
 @app.get("/", include_in_schema=False)
 async def index() -> FileResponse:
     """Serve index.html."""
-    return FileResponse(_index, media_type="text/html")
+    return FileResponse(get_static_index(), media_type="text/html")
+
