@@ -1,0 +1,44 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+venv/
+.venv/
+env/
+ENV/
+
+# Testing & Type checking
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Environment variables & secrets (CRITICAL: NEVER COMMIT ACTUAL KEYS)
+.env
+.env.*
+!.env.example
+
+# SQLite Database & Cache
+*.db
+*.db-wal
+*.db-shm
+data/*.db
+data/*.db-wal
+data/*.db-shm
+
+# IDE & Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Cloned third-party references and vendor skills
+_reference/
+_skills/
+

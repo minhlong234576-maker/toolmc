@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+
+# SQLite local data (WAL files không vào git)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/forensics.db
+
+# Secrets — không commit key thật
+.env
+
+# OS
+.DS_Store
+Thumbs.db
