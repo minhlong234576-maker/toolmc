@@ -1008,9 +1008,6 @@
         <button id="setNavBtnOthers" onclick="switchSettingSubTab('others')" class="px-3.5 py-1.5 rounded-lg font-medium transition text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 flex items-center gap-1.5">
           <span>🤖</span> Gemini / OpenAI / Ollama
         </button>
-        <button id="setNavBtnGeneral" onclick="switchSettingSubTab('general')" class="px-3.5 py-1.5 rounded-lg font-medium transition text-gray-400 hover:text-gray-200 hover:bg-gray-800/60 flex items-center gap-1.5">
-          <span>🛡️</span> Mặc Định & An Toàn
-        </button>
       </div>
 
       <!-- Settings Modal Content Body -->
@@ -1136,8 +1133,25 @@
           </div>
         </div>
 
-        <!-- 4. TAB OTHERS (GEMINI, OPENAI, OLLAMA) -->
+        <!-- 4. TAB OTHERS (GEMINI, OPENAI, OLLAMA & CẤU HÌNH AI) -->
         <div id="setSubTabOthers" class="space-y-4 hidden">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pb-3 border-b border-gray-800">
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">AI Provider Ưu Tiên</label>
+              <select id="setProvider" class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:border-indigo-500 font-mono text-xs">
+                <option value="xai247">⚡ XAI247 Gateway (deepseek-v4.1-flash / claude-3-5-sonnet)</option>
+                <option value="meta">🦙 Meta AI / Llama (llama-3.3-70b-instruct)</option>
+                <option value="ollama">🟢 Ollama Local (Mô hình chạy nội bộ máy)</option>
+                <option value="gemini">Google Gemini (gemini-1.5-flash)</option>
+                <option value="openai">OpenAI (gpt-4o-mini)</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-gray-300 mb-1">Model ID Tùy Chỉnh (Tùy chọn)</label>
+              <input id="setModel" placeholder="VD: deepseek-v4.1-flash, claude-3-5-sonnet..." class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:border-indigo-500 font-mono text-xs">
+            </div>
+          </div>
+
           <div>
             <label class="block text-xs font-semibold text-gray-300 mb-1">Google Gemini API Key</label>
             <div class="relative">
@@ -1162,41 +1176,18 @@
             <span class="text-[11px] text-gray-500">Khởi chạy qua lệnh: <code>ollama run qwen2.5:0.5b</code></span>
           </div>
         </div>
-
-        <!-- 5. TAB GENERAL -->
-        <div id="setSubTabGeneral" class="space-y-4 hidden">
-          <div>
-            <label class="block text-xs font-semibold text-gray-300 mb-1">AI Provider Mặc định toàn ứng dụng</label>
-            <select id="setProvider" class="w-full px-3 py-2.5 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:border-indigo-500 font-mono text-xs">
-              <option value="xai247">⚡ XAI247 Gateway (deepseek-v4.1-flash / claude-3-5-sonnet)</option>
-              <option value="meta">🦙 Meta AI / Llama (llama-3.3-70b-instruct)</option>
-              <option value="ollama">🟢 Ollama Local (Mô hình chạy nội bộ máy)</option>
-              <option value="gemini">Google Gemini (gemini-1.5-flash)</option>
-              <option value="openai">OpenAI (gpt-4o-mini)</option>
-            </select>
-          </div>
-
-          <div>
-            <label class="block text-xs font-semibold text-gray-300 mb-1">Model tùy chỉnh bổ sung (tùy chọn)</label>
-            <input id="setModel" placeholder="VD: deepseek-v4.1-flash, claude-3-5-sonnet, gpt-4o..." class="w-full px-3 py-2 bg-gray-900 border border-gray-700 rounded-lg text-gray-200 focus:outline-none focus:border-indigo-500 font-mono text-xs">
-          </div>
-
-          <div class="p-3.5 rounded-xl bg-gray-900/70 border border-gray-800">
-            <label class="flex items-center gap-2.5 text-xs text-gray-200 font-semibold cursor-pointer">
-              <input id="setStrict" type="checkbox" checked class="accent-rose-500 w-4 h-4 rounded">
-              <span>Bật chế độ Strict READ-ONLY tuyệt đối</span>
-            </label>
-            <p class="text-[11px] text-gray-400 mt-1 pl-6.5 leading-relaxed">
-              Bắt buộc toàn bộ các truy vấn AI và hành động điều khiển chỉ được phép kiểm toán, trích xuất chứng cứ số học và lập báo cáo. Nghiêm cấm đưa ra các lệnh gây hại hoặc phá hủy server.
-            </p>
-          </div>
-        </div>
       </div>
 
       <!-- Modal Footer -->
       <div class="px-6 py-4 border-t border-gray-800 bg-gray-900/90 flex flex-wrap items-center justify-between gap-3">
-        <div id="saveSettingsFeedback" class="text-xs font-mono text-gray-400 flex items-center gap-1.5">
-          <!-- Dynamic status -->
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 text-xs text-gray-300 cursor-pointer select-none" title="Bật/Tắt chế độ Chỉ Đọc (Read-Only)">
+            <input id="setStrict" type="checkbox" checked class="accent-indigo-500 w-4 h-4 rounded">
+            <span>🛡️ Chế độ Read-Only</span>
+          </label>
+          <div id="saveSettingsFeedback" class="text-xs font-mono text-gray-400 flex items-center gap-1.5">
+            <!-- Dynamic status -->
+          </div>
         </div>
         <div class="flex items-center gap-3">
           <button onclick="closeSettings()" class="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-lg text-xs font-medium text-gray-300 transition">
@@ -2801,7 +2792,8 @@ Hãy thực hiện thẩm định:
     }
 
     function switchSettingSubTab(tab) {
-      const tabs = ['pika', 'xai', 'meta', 'others', 'general'];
+      if (tab === 'general') tab = 'others';
+      const tabs = ['pika', 'xai', 'meta', 'others'];
       tabs.forEach(t => {
         const pane = document.getElementById('setSubTab' + t.charAt(0).toUpperCase() + t.slice(1));
         const btn = document.getElementById('setNavBtn' + t.charAt(0).toUpperCase() + t.slice(1));
