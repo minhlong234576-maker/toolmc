@@ -20,6 +20,8 @@ class AIOptions:
     model: str | None = None
     temperature: float = 0.3
     max_tokens: int = 2048
+    api_key: str | None = None
+    api_url: str | None = None
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -223,14 +225,21 @@ class XAI247Provider(AIProvider):
         import httpx
 
         curr_settings = get_settings()
-        api_key = curr_settings.XAI247_API_KEY
+        api_key = (options.api_key or curr_settings.XAI247_API_KEY or "").strip()
         if not api_key:
             raise RuntimeError(
-                "Chưa cấu hình XAI247_API_KEY trong .env! "
-                "Lấy API key tại: https://xai247.xyz"
+                "Chưa có XAI247 API Key! "
+                "Vui lòng nhập API key vào Cài Đặt hoặc lấy key tại: https://xai247.xyz"
             )
 
-        base_url = curr_settings.XAI247_API_URL.strip().rstrip("/")
+        raw_url = (options.api_url or curr_settings.XAI247_API_URL or "https://xai247.xyz/v1").strip().rstrip("/")
+        if "/dashboard" in raw_url:
+            base_url = "https://xai247.xyz/v1"
+        elif not raw_url.endswith("/v1"):
+            base_url = f"{raw_url}/v1"
+        else:
+            base_url = raw_url
+
         endpoint = f"{base_url}/chat/completions"
         model_id = options.model or curr_settings.XAI247_MODEL or self.default_model
 
@@ -323,8 +332,8 @@ def get_ai_status() -> dict[str, Any]:
     xai247_info: dict[str, Any] = {
         "configured": bool(settings.XAI247_API_KEY),
         "url": settings.XAI247_API_URL,
-        "default_model": settings.XAI247_MODEL or "claude-3-5-sonnet",
-        "key_url": "https://xai247.xyz",
+        "default_model": settings.XAI247_MODEL or "deepseek-v4.1-flash",
+        "key_url": "https://xai247.xyz/dashboard/keys",
         "models": [],
     }
     if settings.XAI247_API_KEY:
@@ -339,6 +348,8 @@ def get_ai_status() -> dict[str, Any]:
                 xai247_info["models"] = [m.get("id", "") for m in m_list if m.get("id")]
         except Exception:
             pass
+    if not xai247_info["models"]:
+        xai247_info["models"] = ["deepseek-v4.1-flash", "claude-3-5-sonnet", "gpt-4o", "deepseek-r1"]
 
     return {
         "gemini": {"configured": bool(settings.GEMINI_API_KEY)},
@@ -389,10 +400,11 @@ def analyze_with_provider(prompt: str, provider_name: str, options: AIOptions,
     """
     start = time.perf_counter()
     primary = get_provider(provider_name)
-    if not primary.is_available():
+    if not (options.api_key or primary.is_available()):
         logger.warning("Provider %s chưa cấu hình API key", provider_name)
         raise RuntimeError(
-            f"Provider '{provider_name}' chưa cấu hình. Điền API key trong .env (GEMINI_API_KEY / OPENAI_API_KEY / META_API_KEY / XAI247_API_KEY) hoặc chạy Ollama local."
+            f"Provider '{provider_name}' chưa cấu hình API key. "
+            f"Vui lòng nhập API key trong Cài Đặt hoặc lấy key tại https://xai247.xyz"
         )
     try:
         text = primary.analyze(prompt, system_prompt, options)

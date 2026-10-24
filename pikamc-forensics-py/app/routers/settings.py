@@ -154,7 +154,12 @@ async def update_system_config(
 
     # XAI247
     if req.xai247_api_url and req.xai247_api_url.strip():
-        updates["xai247_api_url"] = req.xai247_api_url.strip()
+        u = req.xai247_api_url.strip().rstrip("/")
+        if "/dashboard" in u:
+            u = "https://xai247.xyz/v1"
+        elif not u.endswith("/v1"):
+            u = f"{u}/v1"
+        updates["xai247_api_url"] = u
     if is_valid_new_key(req.xai247_api_key):
         updates["xai247_api_key"] = req.xai247_api_key.strip()
     if req.xai247_model and req.xai247_model.strip():
@@ -288,7 +293,13 @@ async def test_ai_connection(req: TestAIRequest) -> dict[str, object]:
     from app.services.ai_service import AIOptions, analyze_with_provider
 
     t0 = time.perf_counter()
-    options = AIOptions(model=req.model or None, max_tokens=25, temperature=0.1)
+    options = AIOptions(
+        model=req.model or None,
+        max_tokens=25,
+        temperature=0.1,
+        api_key=req.api_key or None,
+        api_url=req.api_url or None,
+    )
 
     try:
         response_text, duration_ms = analyze_with_provider(
