@@ -478,18 +478,36 @@ class PikaService:
             online_list = online_raw.get("list", []) if isinstance(online_raw, dict) else (online_raw if isinstance(online_raw, list) else [])
             for p in online_list:
                 uuid = p.get("uuid") or p.get("id") or "" if isinstance(p, dict) else str(p)
-                name = p.get("name") or p.get("username") or "" if isinstance(p, dict) else ""
-                if uuid:
-                    if uuid in players_map:
-                        players_map[uuid]["status"] = "online"
-                    else:
-                        players_map[uuid] = {
-                            "name": name or uuid[:8],
-                            "uuid": uuid,
-                            "status": "online",
-                            "avatar": f"https://mc-heads.net/avatar/{uuid}/40",
-                            "role": "player",
-                        }
+                raw_name = (p.get("name") or p.get("username") or "" if isinstance(p, dict) else "").strip()
+                # Chuẩn hóa nếu tên có prefix clan/danh hiệu tab (VD: "Yumeko .Kttykem" -> ".Kttykem")
+                parts = raw_name.split()
+                clean_name = parts[-1] if len(parts) > 1 else raw_name
+
+                # 4a. Đối chiếu với players_map qua UUID hoặc tên người chơi thực tế
+                matched_uuid = None
+                if uuid and uuid in players_map:
+                    matched_uuid = uuid
+                elif clean_name:
+                    for u, pm in players_map.items():
+                        if pm.get("name", "").lower() == clean_name.lower():
+                            matched_uuid = u
+                            break
+
+                if matched_uuid:
+                    players_map[matched_uuid]["status"] = "online"
+                    if len(parts) > 1:
+                        players_map[matched_uuid]["prefix"] = parts[0]
+                elif clean_name or uuid:
+                    # Người chơi mới kết nối chưa kịp lưu usercache.json
+                    synth_id = uuid or f"online-{abs(hash(clean_name)) % 10000000}"
+                    players_map[synth_id] = {
+                        "name": clean_name or uuid[:8],
+                        "uuid": uuid or synth_id,
+                        "status": "online",
+                        "avatar": f"https://mc-heads.net/avatar/{uuid or clean_name}/40",
+                        "role": "player",
+                    }
+
 
         # 4.1. Đối chiếu thời gian thực từ stream logs/latest.log (tránh độ trễ API panel)
         log_content = await self._get(f"/api/client/servers/{server_id}/files/contents", params={"file": "logs/latest.log"}, ttl=2, is_json=False)
@@ -1085,26 +1103,46 @@ class PikaService:
             online_raw = t_mc.get("players", {})
             server_reported = int(online_raw.get("online") or 0)
             p_list = online_raw.get("list", []) if isinstance(online_raw, dict) else (online_raw if isinstance(online_raw, list) else [])
-            for p in p_list:
+
+            # Sắp xếp ưu tiên các bản ghi có UUID trước để không bị bản ghi prefix (UUID="") chiếm chỗ
+            sorted_raw = sorted(p_list, key=lambda x: (0 if (x.get("uuid") if isinstance(x, dict) else "") else 1))
+            seen_player_names: set[str] = set()
+            has_plugin_prefix = False
+
+            for p in sorted_raw:
                 uuid = p.get("uuid") or p.get("id") or "" if isinstance(p, dict) else str(p)
-                name = p.get("name") or p.get("username") or "" if isinstance(p, dict) else ""
+                raw_name = (p.get("name") or p.get("username") or "" if isinstance(p, dict) else "").strip()
+                if not raw_name and not uuid:
+                    continue
+                parts = raw_name.split()
+                clean_name = parts[-1] if len(parts) > 1 else raw_name
+                if len(parts) > 1:
+                    has_plugin_prefix = True
+
+                # Loại bỏ bản ghi trùng lặp do plugin danh hiệu/clan (như Yumeko) tạo thêm trong tablist
+                if clean_name.lower() in seen_player_names:
+                    continue
+
+                seen_player_names.add(clean_name.lower())
                 online_players.append({
-                    "name": name or (uuid[:8] if uuid else "Steve"),
-                    "uuid": uuid,
-                    "avatar": f"https://mc-heads.net/avatar/{uuid}/32" if uuid else "https://mc-heads.net/avatar/steve/32",
+                    "name": clean_name or (uuid[:8] if uuid else "Steve"),
+                    "uuid": uuid or f"online-{abs(hash(clean_name)) % 10000000}",
+                    "avatar": f"https://mc-heads.net/avatar/{uuid or clean_name}/32",
                     "status": "online",
+                    "prefix": parts[0] if len(parts) > 1 else "",
                 })
 
         act_dict = t_act if isinstance(t_act, dict) and not isinstance(t_act, Exception) else {}
         events = act_dict.get("events", [])
         world_dict = t_world if isinstance(t_world, dict) and not isinstance(t_world, Exception) else {}
 
-        # Luôn đảm bảo online_count hiển thị đúng con số tối đa server báo cáo
-        online_count = max(server_reported, len(online_players))
+        real_player_count = len(online_players)
+        # online_count: số người chơi thực tế
+        online_count = real_player_count
 
-        # Nếu server báo cáo số lượng lớn hơn danh sách chi tiết (ví dụ: Admin dùng /vanish tàng hình, Geyser bedrock proxy, hoặc phiên Sonar đang xác thực):
-        diff = server_reported - len(online_players)
-        if diff > 0:
+        # Nếu server báo cáo lớn hơn thực tế VÀ không phải do plugin prefix tạo thêm slot tablist
+        diff = server_reported - real_player_count
+        if diff > 0 and not has_plugin_prefix:
             for i in range(diff):
                 online_players.append({
                     "name": f"Admin Vanish / Đang kết nối" if diff == 1 else f"Ẩn danh #{i+1}",
@@ -1114,6 +1152,8 @@ class PikaService:
                     "is_vanished": True,
                     "note": "Người chơi tàng hình (/vanish) hoặc kết nối qua proxy"
                 })
+            online_count = len(online_players)
+
 
         return {
             "server_id": server_id,
